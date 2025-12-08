@@ -4,43 +4,32 @@
 #include <numeric>
 #include <Arduino_APDS9960.h>
 
-// Initialize DS18B20 on digital pin 2
-DS18B20 ds(2);
-
-// Define the pin for the start button
 const int START_BUTTON_PIN = 5; 
 
 // Vectors to store the last 5 readings
 std::vector<int> capacitive_readings;
-std::vector<float> temp_readings;
 
-// Vectors to store RGB values
-std::vector<std::tuple<int, int, int>> rgb_readings;
+// CHANGE 1: Change tuple types from <int, int, int> to <float, float, float>
+std::vector<std::tuple<float, float, float>> rgb_readings;
 
-const int MAX_READINGS = 5; // The number of readings to average
-bool logging_active = false; // State variable for logging control
-bool last_button_state = HIGH; // For basic debouncing (HIGH because of PULLUP)
+const int MAX_READINGS = 5; 
+bool logging_active = true; 
+bool last_button_state = HIGH; 
 
-// --- Averaging Functions (Same as before) ---
+// --- Averaging Functions ---
 float calculate_average(const std::vector<int>& data) {
     if (data.empty()) return 0.0;
     long sum = std::accumulate(data.begin(), data.end(), 0L); 
     return (float)sum / data.size();
 }
 
-float calculate_average(const std::vector<float>& data) {
-    if (data.empty()) return 0.0f;
-    float sum = std::accumulate(data.begin(), data.end(), 0.0f); 
-    return sum / data.size();
-}
+// CHANGE 2: Update averaging function to handle floats and return floats
+std::tuple<float, float, float> calculate_tuple_average(const std::vector<std::tuple<float, float, float>>& data) {
+    if (data.empty()) return std::make_tuple(0.0f, 0.0f, 0.0f);
 
-std::tuple<int, int, int> calculate_tuple_average(const std::vector<std::tuple<int, int, int>>& data) {
-    if (data.empty()) return std::make_tuple(0, 0, 0);
-
-    // Use long long to prevent overflow if the vector is very large
-    long long sum_r = 0;
-    long long sum_g = 0;
-    long long sum_b = 0;
+    float sum_r = 0.0f;
+    float sum_g = 0.0f;
+    float sum_b = 0.0f;
 
     for (const auto& item : data) {
         sum_r += std::get<0>(item);
@@ -48,67 +37,54 @@ std::tuple<int, int, int> calculate_tuple_average(const std::vector<std::tuple<i
         sum_b += std::get<2>(item);
     }
 
+    // Debug print
+    // Serial.print("sum_r: "); Serial.println(sum_r);
+
     size_t count = data.size();
     
-    // Integer division will truncate decimals. 
     return std::make_tuple(
-        static_cast<int>(sum_r / count), 
-        static_cast<int>(sum_g / count), 
-        static_cast<int>(sum_b / count)
+        sum_r / count, 
+        sum_g / count, 
+        sum_b / count
     );
 }
-// ---------------------------------------------
 
 void setup() {
-  // Open serial port for communication
   Serial.begin(9600); 
-  
-  // Set the button pin as an input with a built-in pull-up resistor
-  // The button will read LOW when pressed and HIGH when released.
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
   
-    // initialize color sensor 
     if (!APDS.begin()) {
-        // If the sensor is not initialized, throw an error and wait until it is available.
         Serial.print(F("Error initializing APDS9960 sensor."));
         while (!APDS.begin()) {
         Serial.print(F("."));
         delay(500);
         }
     }
-
   Serial.println("Ready. Press button on D1 to start logging...");
 }
 
 void loop() {
-    // 1. Check Button State (Toggle Logging)
+    // 1. Check Button State
     int current_button_state = digitalRead(START_BUTTON_PIN);
-    logging_active = true;
-    // Basic debouncing and state change detection (Falling edge: HIGH to LOW)
+    
     if (current_button_state == LOW && last_button_state == HIGH) {
-        // Button was just pressed (LOW)
-        logging_active = true; // !logging_active; // Toggle the state
+        logging_active = true; // Toggle properly
         
         if (logging_active) {
-            // Print the CSV header when logging starts
             Serial.println();
             Serial.println("--- LOGGING STARTED ---");
-            Serial.println("Timestamp,Avg_Capacitive,Avg_Temp_C");
+            // Added headers for RGB
+            Serial.println("Capacitive,Red_Ratio,Green_Ratio,Blue_Ratio");
         } else {
             Serial.println("--- LOGGING STOPPED ---");
-            // Clear lists when stopping to reset the averaging buffer
             capacitive_readings.clear();
-            temp_readings.clear();
+            rgb_readings.clear(); // Make sure to clear RGB too
         }
-        
-        // Short delay to handle switch bounce (basic debounce)
         delay(50); 
     }
-    // Update the last state for the next check
     last_button_state = current_button_state;
 
-
-    // 2. Data Capture and Logging Logic
+    // 2. Data Capture
     if (logging_active) {
         // --- Get Capacitive Reading ---
         int val = analogRead(A0); 
@@ -116,67 +92,54 @@ void loop() {
         if (capacitive_readings.size() > MAX_READINGS) {
             capacitive_readings.erase(capacitive_readings.begin());
         }
-
-        // --- Get Temperature Reading ---
-        float tempC = -999.0;
-        while (ds.selectNext()) {
-            Serial.println("I am in the while");
-            tempC = ds.getTempC();
-            temp_readings.push_back(tempC);
-            if (temp_readings.size() > MAX_READINGS) {
-                temp_readings.erase(temp_readings.begin());
-            }
-        }
         
         // -- Get Color Reading --
         int r, g, b; 
-        float sum;
-        while (!APDS.colorAvailable() || !APDS.proximityAvailable()) {}
-        APDS.readColor(r, g, b);
-        float redRatio = r / sum;
-        float greenRatio = g / sum;
-        float blueRatio = b / sum;
-        std::tuple<int, int, int> rgb = std::make_tuple(redRatio, greenRatio, blueRatio);
-        rgb_readings.push_back(rgb);
-        if (rgb_readings.size() > MAX_READINGS) {
-            rgb_readings.erase(rgb_readings.begin());
+        
+        // Ensure data is ready
+        if (APDS.colorAvailable()) {
+            APDS.readColor(r, g, b);
+            
+            float sum = r + g + b;
+            
+            // Prevent division by zero if sensor sees absolute pitch black
+            if (sum > 0) {
+                float redRatio = r / sum;
+                float greenRatio = g / sum;
+                float blueRatio = b / sum;
+                
+                // CHANGE 3: Store as tuple of floats
+                rgb_readings.push_back(std::make_tuple(redRatio, greenRatio, blueRatio));
+            } else {
+                 rgb_readings.push_back(std::make_tuple(0.0f, 0.0f, 0.0f));
+            }
+
+            if (rgb_readings.size() > MAX_READINGS) {
+                rgb_readings.erase(rgb_readings.begin());
+            }
         }
 
-
         // --- Calculate and Print CSV Row ---
-        // Only print data once we have MAX_READINGS for both
-        if (capacitive_readings.size() == MAX_READINGS && temp_readings.size() == MAX_READINGS && rgb_readings.size() == MAX_READINGS) {
+        if (capacitive_readings.size() == MAX_READINGS && 
+            rgb_readings.size() == MAX_READINGS) {
             
             float avg_cap = calculate_average(capacitive_readings);
-            float avg_temp = calculate_average(temp_readings);
 
-            std::tuple<int, int, int> avg_rgb = calculate_tuple_average(rgb_readings);
+            // CHANGE 4: Receive float tuple
+            std::tuple<float, float, float> avg_rgb = calculate_tuple_average(rgb_readings);
             float avg_red = std::get<0>(avg_rgb);
             float avg_green = std::get<1>(avg_rgb);
             float avg_blue = std::get<2>(avg_rgb);
 
-            // Format the output as a CSV row: Avg_Capacitive,Avg_Temp_C
-            // We use millis() for a simple timestamp
-            Serial.print(millis());
+            Serial.print(avg_cap, 2); 
             Serial.print(",");
-            Serial.print(avg_cap, 2); // Print capacitive with 2 decimal places
+            Serial.print(avg_red, 4);   // Print 4 decimals for better ratio precision
             Serial.print(",");
-            Serial.println(avg_temp, 2); // Print temperature with 2 decimal places
-
-            Serial.println(avg_red, 2);
+            Serial.print(avg_green, 4);
             Serial.print(",");
-            Serial.println(avg_green, 2);
-            Serial.print(",");
-            Serial.println(avg_blue, 2);
-        }
-        else {
-            Serial.println("Stuck here");
-            Serial.println(capacitive_readings.size());
-            Serial.println(temp_readings.size());
-            Serial.println(rgb_readings.size());
+            Serial.println(avg_blue, 4);
         }
     }
     
-    // Read every 100 milliseconds (adjust as needed)
-    delay(100); 
+    delay(50); 
 }
