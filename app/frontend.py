@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import time
 import os
+import base64
 
 # --- CONFIG ---
 API_URL = "http://localhost:8000/current-drink"
@@ -11,6 +12,17 @@ st.set_page_config(
     page_icon="🍷",
     layout="wide"
 )
+
+
+# --- HELPER: IMAGE TO BASE64 ---
+# Essential for displaying local images inside custom HTML blocks
+def get_img_as_base64(file_path):
+    if not os.path.exists(file_path):
+        return None
+    with open(file_path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
 
 # --- CUSTOM CSS ---
 st.markdown("""
@@ -34,7 +46,10 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         text-align: center;
-        margin: 2rem 0;
+        margin: 1rem 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     /* Title styling */
@@ -54,7 +69,7 @@ st.markdown("""
         font-size: 3rem;
         font-weight: 700;
         color: #fff;
-        margin: 1.5rem 0 0.5rem 0;
+        margin: 1rem 0;
         text-transform: uppercase;
         letter-spacing: 3px;
         text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
@@ -82,22 +97,39 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(238, 9, 121, 0.4);
     }
 
-    /* Image container */
-    .image-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0.5rem 0;
+    /* Image styling */
+    .drink-img {
+        max-width: 100%;
+        height: auto;
+        max-height: 300px; /* Limit height to keep layout sane */
+        border-radius: 12px;
+        margin: 1rem 0;
+        transition: transform 0.3s ease;
     }
 
-    /* Remove white background from images */
-    .image-container img {
-        background: transparent !important;
+    /* Pulse animation for scanning */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.02); }
+    }
+    .scanning {
+        animation: pulse 2s ease-in-out infinite;
     }
 
-    /* Confidence display */
-    .confidence-container {
-        margin: 2rem 0;
+    /* Custom HTML Progress Bar */
+    .progress-wrapper {
+        width: 100%;
+        background-color: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        margin-top: 10px;
+        height: 10px;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        transition: width 0.5s ease;
     }
 
     .confidence-label {
@@ -105,36 +137,13 @@ st.markdown("""
         font-size: 0.9rem;
         text-transform: uppercase;
         letter-spacing: 2px;
-        margin-bottom: 0.5rem;
+        margin-top: 1rem;
     }
 
     .confidence-value {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
         color: #fff;
-        margin-bottom: 1rem;
-    }
-
-    /* Pulse animation for scanning */
-    @keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-        }
-        50% {
-            opacity: 0.7;
-            transform: scale(1.05);
-        }
-    }
-
-    .scanning {
-        animation: pulse 2s ease-in-out infinite;
-    }
-
-    /* Progress bar custom styling */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
     }
 
     /* Error message styling */
@@ -157,12 +166,12 @@ public_folder = os.path.join(current_dir, "public")
 # --- FETCH DATA FROM API ---
 def get_data():
     try:
-        response = requests.get(API_URL, timeout=2)
+        response = requests.get(API_URL, timeout=0.5)
         if response.status_code == 200:
             return response.json()
     except:
-        return None
-    return {"label": "API Error", "confidence": 0.0, "status": "Offline"}
+        pass
+    return None  # Return None if connection fails
 
 
 data = get_data()
@@ -170,70 +179,76 @@ data = get_data()
 # --- UI LOGIC ---
 st.markdown('<h1 class="main-title">🍷 Smart Bar</h1>', unsafe_allow_html=True)
 
-if data:
-    status = data.get('status', 'Unknown')
-    label = data.get('label', 'Unknown')
-    confidence = data.get('confidence', 0.0)
+# Create centered column layout
+col1, col2, col3 = st.columns([1, 2, 1])
 
-    # Create centered column layout
-    col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    if data:
+        status = data.get('status', 'Connected')
+        label = data.get('label', 'Unknown')
+        confidence = data.get('confidence', 0.0)
 
-    with col2:
-        # Status Badge
-        status_class = "status-online" if status == "Connected" else "status-offline"
-        status_icon = "🟢" if status == "Connected" else "🔴"
-        st.markdown(f'<div class="status-badge {status_class}">{status_icon} {status}</div>', unsafe_allow_html=True)
-
-        # Drink Card
-        st.markdown('<div class="drink-card">', unsafe_allow_html=True)
-
-        # Drink Name
-        display_label = label if label != "Unknown" else "Scanning..."
-        st.markdown(f'<div class="drink-name">{display_label}</div>', unsafe_allow_html=True)
-
-        # Image Display
+        # 1. PREPARE IMAGE
         image_map = {
-            "WATER": os.path.join(public_folder, "water_1.png"),
-            "BEER": os.path.join(public_folder, "beer_1.png"),
-            "WINE": os.path.join(public_folder, "wine_1.png"),
-            "APEROL": os.path.join(public_folder, "aperol_1.png"),
-            "RUM": os.path.join(public_folder, "rum_1.png")
+            "WATER": "water_1.png",
+            "BEER": "beer_1.png",
+            "WINE": "wine_1.png",
+            "APEROL": "aperol_1.png",
+            "RUM": "rum_1.png"
         }
 
-        fallback_image = os.path.join(public_folder, "scanning.png")
-        img_path = image_map.get(label, fallback_image)
+        filename = image_map.get(label, "unknown_1.png")
+        full_path = os.path.join(public_folder, filename)
 
-        if os.path.exists(img_path):
-            img_class = "scanning" if label == "Unknown" else ""
-            try:
-                st.markdown(f'<div class="image-container {img_class}">', unsafe_allow_html=True)
-                col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
-                with col_img2:
-                    st.image(img_path, width='stretch')
-                st.markdown('</div>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Error loading image: {e}")
+        # Convert image to b64 to embed in HTML
+        b64_img = get_img_as_base64(full_path)
+
+        img_html = ""
+        img_class = "scanning" if label == "Unknown" else ""
+
+        if b64_img:
+            img_html = f'<img src="data:image/png;base64,{b64_img}" class="drink-img {img_class}" />'
         else:
-            st.warning(f"⚠️ Image not found: {img_path}")
+            img_html = f'<div style="color:white; padding: 2rem;">⚠️ Image not found: {filename}</div>'
 
-        # Confidence Display
+        # 2. PREPARE PROGRESS BAR HTML
+        # Since we are inside an HTML block, we must use HTML/CSS for the bar, not st.progress
+        conf_percent = int(confidence * 100)
+        progress_html = ""
         if confidence > 0:
-            st.markdown('<div class="confidence-container">', unsafe_allow_html=True)
-            st.markdown('<div class="confidence-label">Confidence</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="confidence-value">{int(confidence * 100)}%</div>', unsafe_allow_html=True)
-            st.progress(confidence)
-            st.markdown('</div>', unsafe_allow_html=True)
+            progress_html = f"""
+<div style="width: 100%; margin-top: 1rem;">
+<div class="confidence-label">Confidence</div>
+<div class="confidence-value">{conf_percent}%</div>
+<div class="progress-wrapper">
+<div class="progress-fill" style="width: {conf_percent}%;"></div>
+</div>
+</div>"""
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        # 3. RENDER THE WHOLE CARD AT ONCE
+        status_class = "status-online"
+        status_icon = "🟢"
+        display_label = label if label != "Unknown" else "Scanning..."
 
-else:
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
+        html_block = f"""
+        <div class="drink-card">
+            <div class="status-badge {status_class}">{status_icon} {status}</div>
+            <div class="drink-name">{display_label}</div>
+            {img_html}
+            {progress_html}
+        </div>
+        """
+
+        st.markdown(html_block, unsafe_allow_html=True)
+
+    else:
+        # Offline State
         st.markdown("""
         <div class="error-container">
+            <div class="status-badge status-offline">🔴 Offline</div>
             <h2>⚠️ Connection Error</h2>
-            <p>Cannot connect to FastAPI Backend</p>
-            <p>Please ensure the server is running on <code>localhost:8000</code></p>
+            <p>Cannot connect to Backend API</p>
+            <p style="font-size: 0.8rem; opacity: 0.7">Ensure server is running on localhost:8000</p>
         </div>
         """, unsafe_allow_html=True)
 

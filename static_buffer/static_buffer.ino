@@ -15,11 +15,13 @@ BLEService drinkService(SERVICE_UUID);
 BLEStringCharacteristic drinkCharacteristic(CHARACTERISTIC_UUID, BLERead | BLENotify, 20);
 
 // Hardware Pins
-const int ledPin = 2;
-const int moisturePin = A0;
+const int ledPin = 5;
+const int moisturePin = A1;
 
 const float TRAIN_SET_MAX = 491.4;
-const float THRESHOLD_PERCENT = 0.10;      // 10%
+const float THRESHOLD_PERCENT = 0.05;      // 5%
+
+const float SMOOTHING_FACTOR = 0.8;
 
 // Data Buffers for Smoothing
 const int MAX_READINGS = 5; 
@@ -32,7 +34,7 @@ void setup() {
     // while (!Serial); // Keep commented out so it runs on battery!
 
     pinMode(ledPin, OUTPUT);
-    digitalWrite(ledPin, HIGH); // Turn on Light for sensing
+    digitalWrite(ledPin, LOW); // Turn on Light for sensing
 
     // 1. Init Sensors
     if (!APDS.begin()) {
@@ -91,6 +93,7 @@ void loop() {
         float avg_cap = 0;
         for(int v : cap_readings) avg_cap += v;
         avg_cap /= MAX_READINGS;
+        // avg_cap *= SMOOTHING_FACTOR;
 
         float avg_r = 0, avg_g = 0, avg_b = 0;
         for(auto& t : rgb_readings) {
@@ -137,7 +140,17 @@ void loop() {
         if (max_index >= 0) {
             bestLabel = String(result.classification[max_index].label);
 
-            float threshold_val = TRAIN_SET_MAX * THRESHOLD_PERCENT;
+            float threshold_val = TRAIN_SET_MAX + TRAIN_SET_MAX * THRESHOLD_PERCENT;
+
+            Serial.print("Capacitive: ");
+            Serial.println(avg_cap);
+
+            Serial.print("Color: ");
+            Serial.print(avg_r);
+            Serial.print(" ");
+            Serial.print(avg_g);
+            Serial.print(" ");
+            Serial.println(avg_b);
 
             if (avg_cap > threshold_val) {
                 bestLabel = "Unknown";
@@ -163,6 +176,6 @@ void loop() {
             }
         }
         
-        delay(200); // Small delay to prevent spamming
+        delay(1000); // Small delay to prevent spamming
     }
 }
