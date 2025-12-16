@@ -18,6 +18,9 @@ BLEStringCharacteristic drinkCharacteristic(CHARACTERISTIC_UUID, BLERead | BLENo
 const int ledPin = 2;
 const int moisturePin = A0;
 
+const float TRAIN_SET_MAX = 491.4;
+const float THRESHOLD_PERCENT = 0.10;      // 10%
+
 // Data Buffers for Smoothing
 const int MAX_READINGS = 5; 
 std::vector<int> cap_readings;
@@ -133,6 +136,13 @@ void loop() {
 
         if (max_index >= 0) {
             bestLabel = String(result.classification[max_index].label);
+
+            float threshold_val = TRAIN_SET_MAX * THRESHOLD_PERCENT;
+
+            if (avg_cap > threshold_val) {
+                bestLabel = "Unknown";
+            }
+
             
             // Print to Serial (for debugging)
             Serial.print("Detected: ");
