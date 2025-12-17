@@ -5,7 +5,10 @@ import os
 import base64
 
 # --- CONFIG ---
-API_URL = "http://localhost:8000/current-drink"
+API_BASE = "http://localhost:8000"
+URL_DRINK = f"{API_BASE}/current-drink"
+# [NEW] Endpoint for sip data
+URL_SIP = f"{API_BASE}/last-sip"
 
 st.set_page_config(
     page_title="NanoBartender",
@@ -15,7 +18,6 @@ st.set_page_config(
 
 
 # --- HELPER: IMAGE TO BASE64 ---
-# Essential for displaying local images inside custom HTML blocks
 def get_img_as_base64(file_path):
     if not os.path.exists(file_path):
         return None
@@ -50,6 +52,29 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         align-items: center;
+    }
+
+    /* [NEW] Sip Card Styling */
+    .sip-container {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        width: 80%;
+    }
+
+    .sip-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #a0a0b0;
+        margin-bottom: 0.2rem;
+    }
+
+    .sip-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #4fd1c5; /* Teal color for contrast */
     }
 
     /* Title styling */
@@ -101,7 +126,7 @@ st.markdown("""
     .drink-img {
         max-width: 100%;
         height: auto;
-        max-height: 300px; /* Limit height to keep layout sane */
+        max-height: 300px;
         border-radius: 12px;
         margin: 1rem 0;
         transition: transform 0.3s ease;
@@ -164,17 +189,19 @@ public_folder = os.path.join(current_dir, "public")
 
 
 # --- FETCH DATA FROM API ---
-def get_data():
+def get_json(url):
     try:
-        response = requests.get(API_URL, timeout=0.5)
+        response = requests.get(url, timeout=0.5)
         if response.status_code == 200:
             return response.json()
     except:
         pass
-    return None  # Return None if connection fails
+    return None
 
 
-data = get_data()
+data = get_json(URL_DRINK)
+# [NEW] Fetch sip data
+sip_data = get_json(URL_SIP)
 
 # --- UI LOGIC ---
 st.markdown('<h1 class="main-title">🍷 NanoBartender </h1>', unsafe_allow_html=True)
@@ -210,49 +237,55 @@ with col2:
             filename = "connecting_1.png"
 
         full_path = os.path.join(public_folder, filename)
-
-        # Convert image to b64 to embed in HTML
         b64_img = get_img_as_base64(full_path)
 
         img_html = ""
         img_class = "scanning" if label == "Unknown" else ""
-
-        if status == "Connecting":
-            img_class = "scanning"
+        if status == "Connecting": img_class = "scanning"
 
         if b64_img:
             img_html = f'<img src="data:image/png;base64,{b64_img}" class="drink-img {img_class}" />'
         else:
             img_html = f'<div style="color:white; padding: 2rem;">⚠️ Image not found: {filename}</div>'
 
-        # 2. PREPARE PROGRESS BAR HTML
-        # Since we are inside an HTML block, we must use HTML/CSS for the bar, not st.progress
+        # 2. PROGRESS BAR
         conf_percent = int(confidence * 100)
         progress_html = ""
         if confidence > 0:
             progress_html = f"""
 <div style="width: 100%; margin-top: 1rem;">
-<div class="confidence-label">Confidence</div>
-<div class="confidence-value">{conf_percent}%</div>
-<div class="progress-wrapper">
-<div class="progress-fill" style="width: {conf_percent}%;"></div>
-</div>
+    <div class="confidence-label">Confidence</div>
+    <div class="confidence-value">{conf_percent}%</div>
+    <div class="progress-wrapper">
+        <div class="progress-fill" style="width: {conf_percent}%;"></div>
+    </div>
 </div>"""
 
-        # 3. RENDER THE WHOLE CARD AT ONCE
+        # 3. [NEW] SIP DURATION SECTION
+        sip_html = ""
+        if sip_data and sip_data.get('duration', 0) > 0:
+            duration_sec = sip_data['duration'] / 1000.0
+            sip_html = f"""
+<div class="sip-container">
+    <div class="sip-label">Last Sip Duration</div>
+    <div class="sip-value">{duration_sec:.1f}s</div>
+</div>
+"""
+
+        # 4. RENDER CARD
         if status != "Disconnected":
             status_class = "status-online"
             status_icon = "🟢"
         display_label = label if label != "Unknown" else "Scanning..."
 
         html_block = f"""
-        <div class="drink-card">
-            <div class="status-badge {status_class}">{status_icon} {status}</div>
-            <div class="drink-name">{display_label}</div>
-            {img_html}
-            {progress_html}
-        </div>
-        """
+<div class="drink-card">
+    <div class="status-badge {status_class}">{status_icon} {status}</div>
+    <div class="drink-name">{display_label}</div>
+    {img_html}
+    {progress_html}
+    {sip_html} </div>
+"""
 
         st.markdown(html_block, unsafe_allow_html=True)
 

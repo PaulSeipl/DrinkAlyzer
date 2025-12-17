@@ -3,33 +3,50 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# Data Model
+# --- DATA MODELS ---
 class DrinkData(BaseModel):
     label: str
     confidence: float
     status: str
 
-# In-Memory Database (Just a global variable for now)
-# Default state
-current_state = {
+class SipData(BaseModel):
+    duration: int  # Duration in milliseconds
+
+# --- IN-MEMORY STORAGE ---
+current_drink_state = {
     "label": "Ready",
     "confidence": 0.0,
     "status": "Waiting for BLE..."
+}
+
+current_sip_state = {
+    "duration": 0
 }
 
 @app.get("/")
 def home():
     return {"message": "Sommelier API is running"}
 
-# 1. Endpoint for BLE Script to PUSH data
+# --- DRINK ENDPOINTS ---
 @app.post("/update")
 def update_drink(data: DrinkData):
-    global current_state
-    current_state = data.dict()
-    print(f"API Received: {current_state}") # Log to terminal
+    global current_drink_state
+    current_drink_state = data.dict()
+    print(f"API (Drink): {current_drink_state}")
     return {"status": "success"}
 
-# 2. Endpoint for Streamlit to GET data
 @app.get("/current-drink")
 def get_current_drink():
-    return current_state
+    return current_drink_state
+
+# --- NEW: SIP ENDPOINTS ---
+@app.post("/update-sip")
+def update_sip(data: SipData):
+    global current_sip_state
+    current_sip_state = data.dict()
+    print(f"API (Sip): {current_sip_state}")
+    return {"status": "success"}
+
+@app.get("/last-sip")
+def get_last_sip():
+    return current_sip_state

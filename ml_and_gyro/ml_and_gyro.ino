@@ -203,7 +203,16 @@ void runGyroLogic() {
         Serial.print("COMPLETED! Sip Duration: ");
         Serial.print(sipDuration);
         Serial.println(" ms");
-        currentState = IDLE; 
+        
+        // --- NEW: SEND TO BLUETOOTH ---
+        BLEDevice central = BLE.central();
+        if (central && central.connected()) {
+            // Send with "SIP:" prefix so Python knows what it is
+            String payload = "SIP:" + String(sipDuration);
+            drinkCharacteristic.writeValue(payload);
+        }
+    
+        currentState = IDLE;
       }
       break;
   }
