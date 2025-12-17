@@ -134,6 +134,39 @@ Dashboard: The Python app visualizes:
     \item Session Stats (Duration of current sip).
 \end{itemize}
 
+\section{Design Choices}
+This section outlines the critical architectural and methodological decisions made during the development of the Drink Analyzer. These choices were driven by hardware constraints, sensor capabilities, and the practical requirements of training a robust machine learning model.
+\subsection{Sensor Selection and Exclusion: The DS18B20}
+Initially, the hardware design included a DS18B20 digital temperature sensor (Figure~\ref{fig:DS18B20}). The hypothesis was that the temperature of the liquid might significantly alter its dielectric properties, thereby affecting the readings from the Capacitive Soil Moisture Sensor.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/ds18b20.png}
+    \caption{DS18B20 Digital Temperature Sensor}
+    \label{fig:DS18B20}
+\end{figure}
+However, during the preliminary testing phase, we decided to exclude this sensor for two main reasons:
+\begin{enumerate}
+    \item Incompatibility: We encountered significant library and protocol incompatibilities between the standard OneWire libraries used for the DS18B20 and the architecture of the Arduino Nano 33 BLE Sense (built on the nRF52840 microcontroller). This created conflicts that hindered the stability of the system.
+    \item Lack of Correlation: Empirical testing revealed that for the temperature ranges typical of drinking beverages (approx. 4°C to 25°C), the variation in temperature did not produce a statistically significant change in the capacitive values captured by our specific sensor. The added complexity of debugging the compatibility issues outweighed the negligible value added to the feature set.
+\end{enumerate}
 
+\subsection{Feature Engineering: RGB Ratios vs. Raw Values}
 
+A crucial design choice was made regarding the processing of color data. The APDS-9960 sensor on the Nano 33 BLE Sense provides raw counts for Red, Green, Blue, and Clear light.
+
+Instead of feeding these raw integers directly into the neural network, we opted to calculate the ratio of each color channel relative to the total light intensity.
+
+\textbf{Reasoning:} Raw values are highly susceptible to ambient light conditions and the distance between the sensor and the liquid. By using ratios ratio the model focuses on the chromaticity of the liquid rather than the intensity of the light. This normalization makes the classifier more robust to environmental changes.
+
+\subsection{Goal: Discrete Classification vs. Mixture Analysis}
+
+The original objective of the project was to analyze the composition of mixed drinks, specifically determining the percentage of different liquids present in a mixture (e.g., "This drink is 20\% Rum and 80\% Coke").
+
+However, we pivoted to a discrete classification goal (identifying distinct, pure liquids) due to two limitations:
+\begin{itemize}
+    \item Sensor Sensitivity: The standard Capacitive Soil Moisture Sensor v1.2 lacks the necessary resolution and sensitivity to detect minute changes in dielectric constants caused by small variations in mixture ratios. It effectively distinguishes between liquids with vastly different properties (e.g., Water vs. Oil) but struggles with subtle gradients in mixtures.
+    \item Data Collection Feasibility: Training a classifier to recognize percentages would have required a regression model or a classifier with a massive number of classes (e.g., "10\% Rum," "20\% Rum," etc.). Collecting a dataset large enough to cover all these permutations with statistical significance was deemed unfeasible within the project timeframe.
+\end{itemize}
+
+Consequently, the design choice was made to focus on high-accuracy identification of single liquids (Water, Beer, Wine, etc.), ensuring a reliable and functional prototype rather than an unreliable mixture analyzer.
 \end{document}
