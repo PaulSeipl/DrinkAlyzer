@@ -8,8 +8,8 @@ import base64
 API_URL = "http://localhost:8000/current-drink"
 
 st.set_page_config(
-    page_title="Smart Bar",
-    page_icon="🍷",
+    page_title="NanoBartender",
+    page_icon=":wine_glass:",
     layout="wide"
 )
 
@@ -110,7 +110,7 @@ st.markdown("""
     /* Pulse animation for scanning */
     @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.7; transform: scale(1.02); }
+        50% { opacity: 0.6; transform: scale(1.1); }
     }
     .scanning {
         animation: pulse 2s ease-in-out infinite;
@@ -177,7 +177,7 @@ def get_data():
 data = get_data()
 
 # --- UI LOGIC ---
-st.markdown('<h1 class="main-title">🍷 Smart Bar</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🍷 NanoBartender </h1>', unsafe_allow_html=True)
 
 # Create centered column layout
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -198,6 +198,17 @@ with col2:
         }
 
         filename = image_map.get(label, "unknown_1.png")
+
+        if status == "Disconnected":
+            status_class = "status-offline"
+            status_icon = "🔴"
+            filename = "disconnected_1.png"
+
+        if status == "Connecting":
+            status_class = "status-offline"
+            status_icon = "🟠"
+            filename = "connecting_1.png"
+
         full_path = os.path.join(public_folder, filename)
 
         # Convert image to b64 to embed in HTML
@@ -205,6 +216,9 @@ with col2:
 
         img_html = ""
         img_class = "scanning" if label == "Unknown" else ""
+
+        if status == "Connecting":
+            img_class = "scanning"
 
         if b64_img:
             img_html = f'<img src="data:image/png;base64,{b64_img}" class="drink-img {img_class}" />'
@@ -226,8 +240,9 @@ with col2:
 </div>"""
 
         # 3. RENDER THE WHOLE CARD AT ONCE
-        status_class = "status-online"
-        status_icon = "🟢"
+        if status != "Disconnected":
+            status_class = "status-online"
+            status_icon = "🟢"
         display_label = label if label != "Unknown" else "Scanning..."
 
         html_block = f"""
