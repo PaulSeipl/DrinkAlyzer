@@ -43,5 +43,97 @@ Edge Computing in the IoT}
 
 \maketitle
 
+\section{Introduction}
+
+\section{Hardware Architecture \& Sensors}
+The system relies on a sensor fusion approach to capture distinct physical and optical properties of liquids, as well as the motion of the device itself.
+\subsection*{Microcontroller: Arduino Nano 33 BLE Sense}
+The core processing unit is the Arduino Nano 33 BLE Sense. It was chosen for its small form factor and its rich set of onboard sensors, specifically the color sensor, which is crucial for this application. It handles sensor data acquisition, runs the Edge Impulse inference engine, and manages state transitions.
+\subsection*{Capacitive Soil Moisture Sensor v1.0}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.2\textwidth]{images/capacitive.png}
+    \caption{Capacitive Soil Moisture Sensor v1.0}
+\end{figure}
+\textbf{Specfications:}
+\begin{itemize}
+    \item Operating Voltage: $3.3 \sim 5.5$ VDC
+    \item Output Voltage: $0 \sim 3.0$ VDC
+    \item Operating Current: 5mA
+    \item Interface: PH2.0-3P
+    \item Dimensions: $3.86 \times 0.905$ inches (L x W)
+    \item Weight: 15g
+\end{itemize}
+\textbf{Purpose:} To measure the dielectric permittivity of the liquid.\\
+\textbf{Mechanism:} While typically used for soil, this sensor measures capacitance changes based on the medium it is submerged in. Different liquids have different dielectric constants, resulting in distinct analog voltage outputs.\\
+\textbf{Characteristics:} Corrosion-resistant probe, analog output interface.
+\subsection*{IMU (MPU-6886)}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.2\textwidth]{images/IMU.png}
+    \caption{MPU-6886 6-axis IMU}
+\end{figure}
+\textbf{Specifications:}
+\begin{itemize}
+    \item 3-axis gravity accelerometer and 3-axis gyroscope
+    \item On-chip temperature sensor
+    \item 1KB FIFO
+    \item Supports low power consumption
+    \item Development platforms: Arduino, UIFlow (Blockly, Python)
+    \item 2 x LEGO-compatible holes
+\end{itemize}
+    \textbf{Purpose:} To detect motion and orientation for "Drinking Mode."\\
+    \textbf{Mechanism:} The MPU-6886 is a 6-axis MotionTracking device that combines a 3-axis gyroscope and a 3-axis accelerometer.\\
+    \textbf{Role in Project:} It detects the specific tilt angle and stability associated with the action of taking a sip.
+\subsection*{Wired Push Button}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.3\textwidth]{images/button.jpg}
+    \caption{Wired Push Button}
+\end{figure}
+\begin{itemize}
+    \item Purpose: User input for state management.
+    \item Function: Acts as a physical interrupt or toggle switch to transition the system between "Classification Mode" (identifying the drink) and "Drinking Mode" (monitoring consumption).
+\end{itemize}
+
+\section{System Design \& Integration}
+The system logic is divided into two distinct operational modes triggered by user interaction.
+\subsection{Data Acquisition Strategy}
+To ensure reliable data for classification, raw sensor values were not used directly. Instead, a moving average filter was implemented:
+\begin{itemize}
+    \item Sampling: The system collects 5 consecutive readings from both the Capacitive Sensor and the RGB Color Sensor.
+    \item Averaging: These values are averaged to reduce signal noise and outliers, providing a stable feature vector for the classifier.
+\end{itemize}
+\subsection{Operational Flow}
+\begin{enumerate}
+    \item Idle/Start: System initializes sensors and connects to the web interface.
+    \item Classification Mode: The device reads capacitance and RGB values. The on-device TinyML model infers the liquid type.
+    \item Mode Switch: Pressing the wired button toggles the state.
+    \item Drinking Mode: The system continuously monitors the MPU-6886. If the pitch/roll exceeds a defined threshold (indicating a tilt), a timer starts. The timer stops when the device returns to a flat position, calculating the total "sip duration."
+\end{enumerate}
+
+\section{Machine Learning Implementation}
+The core intelligence of the Drink Analyzer is a classifier trained using Edge Impulse.
+
+Dataset Creation:
+\begin{itemize}
+    \item Classes: Water, Beer, Wine, Aperol, Rum.
+    \item Features: Capacitance (Analog Value), Red, Green, Blue (Color Channels).
+    \item Data Collection: A rigorous data collection phase was conducted, capturing varied samples for each liquid to ensure robustness.
+    \item Model Architecture: A Neural Network classifier was designed to take the 4 input features and output a probability distribution across the 5 classes.
+    \item Performance: The model achieved 100\% accuracy on the training set, indicating distinct separability between the chosen liquids based on color and capacitance.
+    \item Deployment: The trained model was exported as an Arduino library and deployed directly to the Nano 33 BLE Sense, allowing for offline, low-latency inference.
+\end{itemize}
+
+\section{User Interface (Web Application)}
+To enhance usability, a Python-based web application was developed.\\
+Connectivity: The Arduino sends classification results and sip duration data via Bluetooth to the host computer.\\
+Dashboard: The Python app visualizes:
+\begin{itemize}
+    \item Current Drink Detected.
+    \item Session Stats (Duration of current sip).
+\end{itemize}
+
+
 
 \end{document}
