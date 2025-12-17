@@ -131,12 +131,28 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(buttonPin), toggleSystem, RISING);
 }
 
+volatile bool modeChanged = false;
+
 // ===================================================================================
 //                                   MAIN LOOP
 // ===================================================================================
 
 void loop() {
   // BLE.poll(); // Keep BLE connection alive
+
+  if (modeChanged) {
+    modeChanged = false; // Reset flag
+    
+    // Send the new mode to the phone
+    if (systemModeHigh) {
+       drinkCharacteristic.writeValue("MODE:SIP");
+       Serial.println(">> Switched to SIP Mode");
+    } else {
+       drinkCharacteristic.writeValue("MODE:SCAN");
+       Serial.println(">> Switched to SCAN Mode");
+    }
+    delay(100); // Small safety buffer
+  }
 
   if (systemModeHigh) {
     // === MODE A: GYRO / SIP DETECTION ===
@@ -203,7 +219,7 @@ void runGyroLogic() {
         Serial.print("COMPLETED! Sip Duration: ");
         Serial.print(sipDuration);
         Serial.println(" ms");
-        
+
         // --- NEW: SEND TO BLUETOOTH ---
         BLEDevice central = BLE.central();
         if (central && central.connected()) {
@@ -220,7 +236,7 @@ void runGyroLogic() {
 
 // --- FUNCTION 2: ML / BLE LOGIC ---
 void runMLLogic() {
-  // Non-blocking timer: Only run every 1 second (ML_INTERVAL)
+  // Non-blocking timer: Only run every n seconds (ML_INTERVAL)
   // This allows the button interrupt to work instantly even in ML mode
   if (millis() - lastMLRunTime < ML_INTERVAL) {
     return;
@@ -325,6 +341,9 @@ void toggleSystem() {
     
     // Toggle the Built-in LED to indicate the change
     digitalWrite(LED_BUILTIN, systemModeHigh ? HIGH : LOW);
+
+    // Tell the loop to send the message!
+    modeChanged = true;
     
     lastDebounceTime = currentTime;
   }

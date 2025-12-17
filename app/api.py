@@ -23,6 +23,8 @@ current_sip_state = {
     "duration": 0
 }
 
+current_mode = {"mode": "SCAN"}
+
 @app.get("/")
 def home():
     return {"message": "Sommelier API is running"}
@@ -50,3 +52,14 @@ def update_sip(data: SipData):
 @app.get("/last-sip")
 def get_last_sip():
     return current_sip_state
+
+@app.post("/update-mode")
+def update_mode(data: dict):
+    global current_mode
+    current_mode = data
+    print(f"API (Mode): {current_mode}")
+    return {"status": "success"}
+
+@app.get("/mode")
+def get_mode():
+    return current_mode

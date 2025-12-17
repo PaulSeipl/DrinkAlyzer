@@ -7,6 +7,7 @@ from bleak import BleakScanner, BleakClient, BleakError
 BASE_URL = "http://localhost:8000"
 API_URL_DRINK = f"{BASE_URL}/update"
 API_URL_SIP = f"{BASE_URL}/update-sip"
+API_URL_MODE = f"{BASE_URL}/update-mode"
 
 CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 
@@ -20,6 +21,13 @@ def send_drink_to_api(label, confidence, status):
         requests.post(API_URL_DRINK, json=payload)
     except Exception as e:
         print(f"API Error (Drink): {e}")
+
+def send_mode_to_api(mode_str):
+    try:
+        requests.post(API_URL_MODE, json={"mode": mode_str})
+        print(f"🔄 Mode Switch: {mode_str}")
+    except Exception as e:
+        print(f"API Error (Mode): {e}")
 
 
 def send_sip_to_api(duration_ms):
@@ -35,7 +43,13 @@ def notification_handler(sender, data):
     try:
         text = data.decode('utf-8')
 
-        # --- NEW: Check for Sip Data ---
+        # --- Check for Mode Change Data ---
+        if text.startswith("MODE:"):
+            # text is "MODE:SIP" or "MODE:SCAN"
+            mode = text.split(":")[1]
+            send_mode_to_api(mode)
+
+        # --- Check for Sip Data ---
         if text.startswith("SIP:"):
             # Format is "SIP:2500"
             parts = text.split(":")

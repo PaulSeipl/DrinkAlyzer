@@ -7,8 +7,8 @@ import base64
 # --- CONFIG ---
 API_BASE = "http://localhost:8000"
 URL_DRINK = f"{API_BASE}/current-drink"
-# [NEW] Endpoint for sip data
 URL_SIP = f"{API_BASE}/last-sip"
+URL_MODE = f"{API_BASE}/mode"
 
 st.set_page_config(
     page_title="NanoBartender",
@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 
-# --- HELPER: IMAGE TO BASE64 ---
+# --- IMAGE TO BASE64 ---
 def get_img_as_base64(file_path):
     if not os.path.exists(file_path):
         return None
@@ -200,11 +200,41 @@ def get_json(url):
 
 
 data = get_json(URL_DRINK)
-# [NEW] Fetch sip data
 sip_data = get_json(URL_SIP)
+mode_data = get_json(URL_MODE)
 
 # --- UI LOGIC ---
 st.markdown('<h1 class="main-title">🍷 NanoBartender </h1>', unsafe_allow_html=True)
+
+if mode_data:
+    current_mode = mode_data.get("mode", "UNKNOWN")
+
+    # Visual Logic
+    if current_mode == "SIP":
+        mode_color = "#f6ad55"  # Orange
+        mode_icon = "🥤"
+    elif current_mode == "SCAN":
+        mode_color = "#63b3ed"  # Blue
+        mode_icon = "📡"
+    else:
+        mode_color = "#718096"  # Grey
+        mode_icon = "❓"
+
+    st.markdown(f"""
+    <div style="
+        position: fixed; 
+        top: 20px; 
+        right: 20px; 
+        background-color: {mode_color}; 
+        padding: 10px 20px; 
+        border-radius: 30px; 
+        font-weight: bold; 
+        color: white; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 9999;">
+        {mode_icon} {current_mode} MODE
+    </div>
+    """, unsafe_allow_html=True)
 
 # Create centered column layout
 col1, col2, col3 = st.columns([1, 2, 1])
