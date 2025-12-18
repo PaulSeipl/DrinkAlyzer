@@ -333,6 +333,21 @@ The original objective was to analyze the composition of mixed drinks (e.g., per
     \item \textbf{Data Collection:} Training a classifier for percentages would require an unfeasible amount of data to cover all permutations.
 \end{itemize}
 
+\subsection{Sampling Frequency Strategy}
+To balance responsiveness with power efficiency, the system implements a dynamic sampling rate strategy dependent on the active operational mode.
+
+\begin{itemize}
+    \item \textbf{Sip Detection Mode ($\approx$ 50 Hz):} 
+    When monitoring for drinking gestures, the system minimizes delay to capture rapid motions. A delay of 20ms is used in the main loop, resulting in a sampling frequency of approximately 50 Hz.
+    \begin{equation}
+        f_{motion} = \frac{1}{T_{delay}} = \frac{1}{0.020s} = 50 \text{ Hz}
+    \end{equation}
+    This high frequency is critical for the gyroscope integration required by the Finite State Machine.
+
+    \item \textbf{Scan Mode (1 Hz):} 
+    For liquid classification, the physical properties (color and capacitance) are static. To conserve power and reduce noise, inference is limited to once per second using a non-blocking timer (\texttt{ML\_INTERVAL = 1000}). This lower frequency also ensures the main loop remains responsive to button interrupts without blocking execution.
+\end{itemize}
+
 \section{Results \& Evaluation}
 The system was evaluated in a real-world setting to assess both the classification accuracy of the model and the reliability of the sip detection algorithm.
 
