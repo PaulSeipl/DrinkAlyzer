@@ -37,11 +37,40 @@
 Edge Computing in the IoT}
 
 \maketitle
-\tableofcontents
+\small{\tableofcontents}
 \newpage
 
 \section{Introduction}
 The Nano Bartender is an IoT system designed to classify beverages using a classifier model. Built upon the Arduino Nano 33 BLE Sense, the device leverages sensor fusion to analyze the optical and dielectric properties of liquids. Furthermore, it integrates a decoupled software architecture, utilizing Bluetooth Low Energy (BLE) to communicate with a Python-based web dashboard for real-time visualization of drink types and sip duration.
+
+\section{Project Overview}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/prototype.png}
+    \caption{Prototype idea of the Nano Bartender system}
+\end{figure}
+To guide the development of the "Nano Bartender," a set of specific requirements was defined during the initial design phase. These objectives ensured the device would be portable, responsive, and capable of distinguishing between beverages using sensor fusion.
+
+\subsection{Functional Requirements}
+The following functions were identified as critical for the system's operation:
+
+\begin{itemize}
+    \item \textbf{FR1 -- Sensor Acquisition:} The device shall read from the chosen sensors and produce stable digital measurements for processing.
+    \item \textbf{FR2 -- Color-Based Drink Identification:} The device shall utilize the APDS-9960 sensor to detect and analyze the liquid's color. This serves as a primary filtering step to distinguish between visually distinct beverages (e.g., Wine vs. Beer) before analyzing dielectric properties.
+    \item \textbf{FR3 -- Environmental Compensation:} The system aims to measure ambient or sample temperature to adjust estimation algorithms, compensating for temperature-dependent variations in sensor readings.
+    \item \textbf{FR4 -- Connectivity:} The device must transmit results securely to a local host (PC or mobile application) via Bluetooth Low Energy (BLE) or Wi-Fi.
+    \item \textbf{FR5 -- Power Management:} The firmware must support a fast boot sequence (ready to measure in $<10$ seconds) and include a low-power idle mode to conserve energy when not in use.
+\end{itemize}
+
+\subsection{Non-Functional Requirements}
+To ensure usability and feasibility, the system must adhere to the following constraints:
+
+\begin{itemize}
+    \item \textbf{NFR1 -- Portability:} The device shall be handheld and battery-powered, targeting a battery life of $\geq 6$ hours of continuous use or $\geq 48$ hours of intermittent use, rechargeable via USB-C.
+    \item \textbf{NFR2 -- Low Latency:} The total time from the user initiating a scan to the result being displayed on the dashboard shall be $\leq 5$ seconds.
+    \item \textbf{NFR3 -- Cost Efficiency:} The Bill of Materials (BOM) should be kept under a target budget (e.g., €50–€80) to ensure the device remains affordable for student-grade projects.
+\end{itemize}
+
 
 \section{Hardware Architecture \& Sensors}
 The system relies on a sensor fusion approach to capture distinct physical and optical properties of liquids, as well as the motion of the device itself.
