@@ -203,7 +203,8 @@ To ensure reliable data for classification, raw sensor values are not used direc
     \end{equation}
     This ensures the model learns the \textit{color} of the liquid rather than the brightness.
 \end{itemize}
-
+\textbf{Training Data Collection:}
+This acquisition pipeline was also utilized to generate the training dataset. We used the physical sensor setup (Capacitive and Nano 33 BLE Sense) to record raw values from each liquid type over fixed time intervals, accumulating hundreds of samples per class. These recordings were initially saved as individual CSV files and subsequently merged into a single master dataset by appending a "label" column to identify the specific beverage.
 \subsection{Sip Detection Algorithm (Finite State Machine)}
 When in "Drinking Mode," a Finite State Machine (FSM) uses the gyroscope and accelerometer to track gestures. The system cycles through four states:
 
