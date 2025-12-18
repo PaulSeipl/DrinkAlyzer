@@ -53,7 +53,7 @@ const int MAX_READINGS = 5;
 std::vector<int> cap_readings;
 std::vector<std::tuple<float, float, float>> rgb_readings;
 
-// Timer for ML loop (to replace delay and keep button responsive)
+// Timer for ML loop
 unsigned long lastMLRunTime = 0;
 const int ML_INTERVAL = 1000; // Run inference every 1 second
 
@@ -71,14 +71,13 @@ void toggleSystem(); // Forward declaration
 
 void setup() {
   Serial.begin(115200);
-  // while (!Serial); // Commented out for battery usage
 
   // --- HARDWARE INIT ---
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(sensorLedPin, OUTPUT);
   pinMode(buttonPin, INPUT_PULLUP);
   
-  digitalWrite(sensorLedPin, LOW); // Start with liquid sensor light OFF
+  digitalWrite(sensorLedPin, LOW);
 
   Wire.begin();
   Wire.setClock(400000);
@@ -138,7 +137,6 @@ volatile bool modeChanged = false;
 // ===================================================================================
 
 void loop() {
-  // BLE.poll(); // Keep BLE connection alive
 
   if (modeChanged) {
     modeChanged = false; // Reset flag
@@ -168,7 +166,6 @@ void loop() {
     digitalWrite(sensorLedPin, HIGH);
 
     runMLLogic();
-    // We do NOT use delay() here. The runMLLogic function uses a non-blocking timer.
   }
 }
 
@@ -176,7 +173,7 @@ void loop() {
 //                                LOGIC FUNCTIONS
 // ===================================================================================
 
-// --- FUNCTION 1: GYRO LOGIC ---
+// --- GYRO LOGIC ---
 void runGyroLogic() {
   IMU.update();
   IMU.getAccel(&accelData);
@@ -220,10 +217,10 @@ void runGyroLogic() {
         Serial.print(sipDuration);
         Serial.println(" ms");
 
-        // --- NEW: SEND TO BLUETOOTH ---
+        // --- SEND TO BLUETOOTH ---
         BLEDevice central = BLE.central();
         if (central && central.connected()) {
-            // Send with "SIP:" prefix so Python knows what it is
+            // Send with "SIP:" prefix
             String payload = "SIP:" + String(sipDuration);
             drinkCharacteristic.writeValue(payload);
         }
@@ -234,10 +231,9 @@ void runGyroLogic() {
   }
 }
 
-// --- FUNCTION 2: ML / BLE LOGIC ---
+// --- ML LOGIC ---
 void runMLLogic() {
   // Non-blocking timer: Only run every n seconds (ML_INTERVAL)
-  // This allows the button interrupt to work instantly even in ML mode
   if (millis() - lastMLRunTime < ML_INTERVAL) {
     return;
   }
